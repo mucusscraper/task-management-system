@@ -3,17 +3,31 @@ package service
 import (
 	"testing"
 
+	"github.com/mucusscraper/task-management-system/internal/database"
 	"github.com/mucusscraper/task-management-system/internal/dto"
 	"github.com/mucusscraper/task-management-system/internal/models"
 )
 
 func TestCreateTask(t *testing.T) {
-	service := NewTaskService()
+	db, err := database.NewPostgres()
+	if err != nil {
+		t.Skip("Pulando teste: PostgreSQL local não está rodando ou configurado")
+		return
+	}
+	defer db.Close()
+
+	service := NewTaskService(db)
 	req := dto.CreateTaskRequest{
 		Title:       "Write complete documentation",
 		Description: "Complete the README",
 	}
-	task, err := service.CreateTask(req)
+	mockSupervisor := models.User{
+		ID:   1,
+		Name: "Supervisor Teste",
+		Role: string(models.Supervisor),
+	}
+
+	task, err := service.CreateTask(req, mockSupervisor) // <- Passando o mockSupervisor aqui
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}

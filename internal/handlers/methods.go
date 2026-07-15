@@ -6,9 +6,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mucusscraper/task-management-system/internal/dto"
+	"github.com/mucusscraper/task-management-system/internal/models"
 )
 
 func (h *TaskHandler) CreateTask(ctx *gin.Context) {
+	currentUser, _ := ctx.Get("currentUser")
+	user, _ := currentUser.(models.User)
+
 	var req dto.CreateTaskRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -16,7 +20,8 @@ func (h *TaskHandler) CreateTask(ctx *gin.Context) {
 		})
 		return
 	}
-	task, err := h.service.CreateTask(req)
+
+	task, err := h.service.CreateTask(req, user)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -27,6 +32,9 @@ func (h *TaskHandler) CreateTask(ctx *gin.Context) {
 }
 
 func (h *TaskHandler) AssignTask(ctx *gin.Context) {
+	currentUser, _ := ctx.Get("currentUser")
+	user, _ := currentUser.(models.User)
+
 	var req dto.AssignTaskRequest
 	taskID, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -41,7 +49,8 @@ func (h *TaskHandler) AssignTask(ctx *gin.Context) {
 		})
 		return
 	}
-	task, err := h.service.AssignTask(taskID, req)
+
+	task, err := h.service.AssignTask(taskID, req, user)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),

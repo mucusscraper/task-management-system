@@ -5,8 +5,7 @@ import (
 	"github.com/mucusscraper/task-management-system/internal/models"
 )
 
-func (s *TaskService) CreateTask(req dto.CreateTaskRequest) (*models.Task, error) {
-
+func (s *TaskService) CreateTask(req dto.CreateTaskRequest, user models.User) (*models.Task, error) {
 	task := &models.Task{
 		ID:          1,
 		Title:       req.Title,
@@ -17,6 +16,6 @@ func (s *TaskService) CreateTask(req dto.CreateTaskRequest) (*models.Task, error
 	return task, nil
 }
 
-func (s *TaskService) AssignTask(taskID int, req dto.AssignTaskRequest) (*models.Task, error) {
+func (s *TaskService) AssignTask(taskID int, req dto.AssignTaskRequest, user models.User) (*models.Task, error) {
 	return nil, nil
 }

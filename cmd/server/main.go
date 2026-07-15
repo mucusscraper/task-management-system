@@ -1,0 +1,30 @@
+package main
+
+import (
+	"log"
+
+	"github.com/gin-gonic/gin"
+	"github.com/mucusscraper/task-management-system/internal/database"
+	"github.com/mucusscraper/task-management-system/internal/handlers"
+	"github.com/mucusscraper/task-management-system/internal/service"
+)
+
+func main() {
+	db, err := database.NewPostgres()
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	defer db.Close()
+	server := gin.Default()
+	tasks := server.Group("/tasks")
+	taskService := service.NewTaskService(db)
+	handler := handlers.NewTaskHandler(taskService)
+	tasks.Use(handlers.AuthMiddleware(db))
+	{
+		tasks.GET("", handler.GetTasks)
+		tasks.POST("", handler.CreateTask)
+		tasks.POST("/:id/assign", handler.AssignTask)
+		tasks.PATCH("/:id/status", handler.UpdateTaskStatus)
+	}
+	server.Run(":8080")
+}
