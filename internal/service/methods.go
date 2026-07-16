@@ -10,6 +10,8 @@ import (
 	"github.com/mucusscraper/task-management-system/internal/models"
 )
 
+// CreateTask persists a new task in the database.
+// Only users with the SUPERVISOR role are allowed to execute this action.
 func (s *TaskService) CreateTask(req dto.CreateTaskRequest, user models.User) (*models.Task, error) {
 	if string(user.Role) != string(models.Supervisor) {
 		return nil, ErrUnauthorized
@@ -35,6 +37,8 @@ func (s *TaskService) CreateTask(req dto.CreateTaskRequest, user models.User) (*
 	return task, nil
 }
 
+// GetTasks fetches task records based on user privileges.
+// Supervisors retrieve all tasks, while Workers only retrieve tasks assigned to them.
 func (s *TaskService) GetTasks(user models.User) ([]models.Task, error) {
 	var rows *sql.Rows
 	var err error
@@ -79,6 +83,8 @@ func (s *TaskService) GetTasks(user models.User) ([]models.Task, error) {
 	return tasks, nil
 }
 
+// UpdateStatus moves a task's progress state forward (e.g. ASSIGNED -> IN_PROGRESS -> COMPLETED).
+// Only the Worker assigned to the task can change its status. It persists a notification on success.
 func (s *TaskService) UpdateStatus(taskID int, req dto.UpdateTaskStatusRequest, user models.User) (*models.Task, error) {
 	if string(user.Role) != string(models.Worker) {
 		return nil, ErrWorkerOnly
@@ -164,6 +170,8 @@ func (s *TaskService) UpdateStatus(taskID int, req dto.UpdateTaskStatusRequest, 
 	return task, nil
 }
 
+// AssignTask delegates an unassigned task to a specific worker.
+// Only Supervisors can assign tasks. It logs and persists a notification record on success.
 func (s *TaskService) AssignTask(taskID int, req dto.AssignTaskRequest, user models.User) (*models.Task, error) {
 	if string(user.Role) != string(models.Supervisor) {
 		return nil, ErrUnauthorized
@@ -212,4 +220,80 @@ func (s *TaskService) AssignTask(taskID int, req dto.AssignTaskRequest, user mod
 	}
 	fmt.Println(notificationMessage)
 	return task, nil
+}
+
+// PingDatabase verifies that the connection to PostgreSQL is alive and responsive.
+func (s *TaskService) PingDatabase() error {
+	return s.db.Ping()
+}
+
+// GetTaskByID retrieves a single task by its unique ID.
+// Supervisors can retrieve any task, whereas Workers can only view tasks assigned to them.
+func (s *TaskService) GetTaskByID(taskID int, user models.User) (*models.Task, error) {
+	query := `
+		SELECT id, title, description, status, assigned_to, created_at, updated_at
+		FROM tasks
+		WHERE id=$1
+	`
+	task := &models.Task{}
+	err := s.db.QueryRow(query, taskID).Scan(
+		&task.ID,
+		&task.Title,
+		&task.Description,
+		&task.Status,
+		&task.AssignedTo,
+		&task.CreatedAt,
+		&task.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+	if string(user.Role) == string(models.Worker) {
+		if task.AssignedTo == nil || *task.AssignedTo != user.ID {
+			return nil, ErrUnauthorized
+		}
+	}
+	return task, nil
+}
+
+// GetNotificationsByUser retrieves the notification log for a specific Worker.
+// Supervisors do not receive notifications, so calling this with a SUPERVISOR role returns an error.
+func (s *TaskService) GetNotificationsByUser(user models.User) ([]models.Notification, error) {
+	query := `
+		SELECT id, user_id, task_id, message, created_at
+		FROM notifications
+		WHERE user_id=$1
+	`
+	var rows *sql.Rows
+	var err error
+	if string(user.Role) == string(models.Supervisor) {
+		return nil, ErrWorkerOnly
+	}
+	rows, err = s.db.Query(query, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	notifications := []models.Notification{}
+	for rows.Next() {
+		var n models.Notification
+		err := rows.Scan(
+			&n.ID,
+			&n.UserID,
+			&n.TaskID,
+			&n.Message,
+			&n.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		notifications = append(notifications, n)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return notifications, nil
 }

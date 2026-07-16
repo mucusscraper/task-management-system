@@ -296,3 +296,109 @@ func TestGetTasks(t *testing.T) {
 		}
 	})
 }
+
+func TestGetTaskByID(t *testing.T) {
+	db, err := database.NewPostgres()
+	if err != nil {
+		t.Skip("PostgreSQL not connecting")
+		return
+	}
+	defer db.Close()
+
+	service := NewTaskService(db)
+
+	supervisor := models.User{ID: 1, Name: "Supervisor", Role: "SUPERVISOR"}
+	worker1 := models.User{ID: 2, Name: "Worker 1", Role: "WORKER"}
+	worker2 := models.User{ID: 3, Name: "Worker 2", Role: "WORKER"}
+
+	task, err := service.CreateTask(dto.CreateTaskRequest{Title: "Single Task test"}, supervisor)
+	if err != nil {
+		t.Fatalf("failed to setup task: %v", err)
+	}
+
+	_, err = service.AssignTask(task.ID, dto.AssignTaskRequest{WorkerID: worker1.ID}, supervisor)
+	if err != nil {
+		t.Fatalf("failed to assign task: %v", err)
+	}
+
+	t.Run("Supervisor should be able to fetch any task by ID", func(t *testing.T) {
+		fetched, err := service.GetTaskByID(task.ID, supervisor)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if fetched.ID != task.ID {
+			t.Errorf("expected task ID %d, got %d", task.ID, fetched.ID)
+		}
+	})
+
+	t.Run("Assigned Worker should be able to fetch their own task", func(t *testing.T) {
+		fetched, err := service.GetTaskByID(task.ID, worker1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if fetched.ID != task.ID {
+			t.Errorf("expected task ID %d, got %d", task.ID, fetched.ID)
+		}
+	})
+
+	t.Run("Should return ErrUnauthorized if worker is not assigned to the task", func(t *testing.T) {
+		_, err := service.GetTaskByID(task.ID, worker2)
+		if !errors.Is(err, ErrUnauthorized) {
+			t.Errorf("expected error %v, got %v", ErrUnauthorized, err)
+		}
+	})
+
+	t.Run("Should return ErrTaskNotFound for invalid task IDs", func(t *testing.T) {
+		_, err := service.GetTaskByID(99999, supervisor)
+		if !errors.Is(err, ErrTaskNotFound) {
+			t.Errorf("expected error %v, got %v", ErrTaskNotFound, err)
+		}
+	})
+}
+
+func TestGetNotificationsByUser(t *testing.T) {
+	db, err := database.NewPostgres()
+	if err != nil {
+		t.Skip("PostgreSQL not connecting")
+		return
+	}
+	defer db.Close()
+
+	service := NewTaskService(db)
+
+	supervisor := models.User{ID: 1, Name: "Supervisor", Role: "SUPERVISOR"}
+	worker1 := models.User{ID: 2, Name: "Worker 1", Role: "WORKER"}
+
+	_, _ = db.Exec("DELETE FROM notifications")
+	_, _ = db.Exec("DELETE FROM tasks")
+
+	task, err := service.CreateTask(dto.CreateTaskRequest{Title: "Notify Test"}, supervisor)
+	if err != nil {
+		t.Fatalf("failed to setup task: %v", err)
+	}
+
+	_, err = service.AssignTask(task.ID, dto.AssignTaskRequest{WorkerID: worker1.ID}, supervisor)
+	if err != nil {
+		t.Fatalf("failed to assign task: %v", err)
+	}
+
+	t.Run("Worker should retrieve their notification history", func(t *testing.T) {
+		notifications, err := service.GetNotificationsByUser(worker1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(notifications) != 1 {
+			t.Errorf("expected 1 notification, got %d", len(notifications))
+		}
+		if notifications[0].UserID != worker1.ID {
+			t.Errorf("expected notification for user %d, got user %d", worker1.ID, notifications[0].UserID)
+		}
+	})
+
+	t.Run("Should return ErrWorkerOnly if Supervisor tries to get notifications", func(t *testing.T) {
+		_, err := service.GetNotificationsByUser(supervisor)
+		if !errors.Is(err, ErrWorkerOnly) {
+			t.Errorf("expected error %v, got %v", ErrWorkerOnly, err)
+		}
+	})
+}

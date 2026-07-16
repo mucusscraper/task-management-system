@@ -19,12 +19,15 @@ func main() {
 	tasks := server.Group("/tasks")
 	taskService := service.NewTaskService(db)
 	handler := handlers.NewTaskHandler(taskService)
+	server.GET("/health", handler.HealthCheck)
 	tasks.Use(handlers.AuthMiddleware(db))
 	{
 		tasks.GET("", handler.GetTasks)
 		tasks.POST("", handler.CreateTask)
 		tasks.POST("/:id/assign", handler.AssignTask)
 		tasks.PATCH("/:id/status", handler.UpdateTaskStatus)
+		tasks.GET("/notifications", handler.GetNotifications)
+		tasks.GET("/:id", handler.GetTaskByID)
 	}
 	server.Run(":8080")
 }
