@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	db, err := database.NewPostgres()
+	db, err := database.NewPostgres("migrations")
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}

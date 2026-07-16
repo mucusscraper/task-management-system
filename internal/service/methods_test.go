@@ -9,10 +9,12 @@ import (
 	"github.com/mucusscraper/task-management-system/internal/models"
 )
 
+const migrationsDir = "../../migrations"
+
 func TestCreateTask(t *testing.T) {
-	db, err := database.NewPostgres()
+	db, err := database.NewPostgres(migrationsDir)
 	if err != nil {
-		t.Skip("Pulando teste: PostgreSQL local não está rodando ou configurado")
+		t.Skip("skipping test: local postgresql not configured")
 		return
 	}
 	defer db.Close()
@@ -21,8 +23,8 @@ func TestCreateTask(t *testing.T) {
 	supervisor := models.User{ID: 1, Name: "Supervisor", Role: "SUPERVISOR"}
 	worker := models.User{ID: 2, Name: "Worker", Role: "WORKER"}
 	req := dto.CreateTaskRequest{
-		Title:       "Testar persistência no banco",
-		Description: "Garantir que a query de INSERT está funcionando",
+		Title:       "test database persistency",
+		Description: "guarantee insert query is working",
 	}
 	t.Run("Must create task with success if supervisor role", func(t *testing.T) {
 		task, err := service.CreateTask(req, supervisor)
@@ -55,9 +57,9 @@ func TestCreateTask(t *testing.T) {
 }
 
 func TestAssignTask(t *testing.T) {
-	db, err := database.NewPostgres()
+	db, err := database.NewPostgres(migrationsDir)
 	if err != nil {
-		t.Skip("PostgreSQL not connecting")
+		t.Fatalf("DATABASE ERROR: %v", err)
 		return
 	}
 	defer db.Close()
@@ -156,7 +158,7 @@ func TestAssignTask(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
-	db, err := database.NewPostgres()
+	db, err := database.NewPostgres(migrationsDir)
 	if err != nil {
 		t.Skip("PostgreSQL not connecting")
 		return
@@ -190,10 +192,10 @@ func TestUpdateStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("Should return ErrUnauthorized if a different worker tries to update status", func(t *testing.T) {
+	t.Run("Should return ErrDifferentWorker if a different worker tries to update status", func(t *testing.T) {
 		_, err := service.UpdateStatus(task.ID, dto.UpdateTaskStatusRequest{}, worker2)
-		if !errors.Is(err, ErrUnauthorized) {
-			t.Errorf("expected %v, got %v", ErrUnauthorized, err)
+		if !errors.Is(err, ErrDifferentWorker) {
+			t.Errorf("expected %v, got %v", ErrDifferentWorker, err)
 		}
 	})
 
@@ -226,7 +228,7 @@ func TestUpdateStatus(t *testing.T) {
 }
 
 func TestGetTasks(t *testing.T) {
-	db, err := database.NewPostgres()
+	db, err := database.NewPostgres(migrationsDir)
 	if err != nil {
 		t.Skip("PostgreSQL not connecting")
 		return
@@ -239,7 +241,7 @@ func TestGetTasks(t *testing.T) {
 	worker1 := models.User{ID: 2, Name: "Worker 1", Role: "WORKER"}
 	worker2 := models.User{ID: 3, Name: "Worker 2", Role: "WORKER"}
 
-	_, err = db.Exec("DELETE FROM tasks")
+	_, err = db.Exec("TRUNCATE TABLE notifications, tasks RESTART IDENTITY CASCADE")
 	if err != nil {
 		t.Fatalf("failed to clean tasks table: %v", err)
 	}
@@ -298,7 +300,7 @@ func TestGetTasks(t *testing.T) {
 }
 
 func TestGetTaskByID(t *testing.T) {
-	db, err := database.NewPostgres()
+	db, err := database.NewPostgres(migrationsDir)
 	if err != nil {
 		t.Skip("PostgreSQL not connecting")
 		return
@@ -357,7 +359,7 @@ func TestGetTaskByID(t *testing.T) {
 }
 
 func TestGetNotificationsByUser(t *testing.T) {
-	db, err := database.NewPostgres()
+	db, err := database.NewPostgres(migrationsDir)
 	if err != nil {
 		t.Skip("PostgreSQL not connecting")
 		return
