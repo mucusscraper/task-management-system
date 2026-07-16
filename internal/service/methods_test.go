@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/mucusscraper/task-management-system/internal/database"
@@ -17,27 +18,38 @@ func TestCreateTask(t *testing.T) {
 	defer db.Close()
 
 	service := NewTaskService(db)
+	supervisor := models.User{ID: 1, Name: "Supervisor", Role: "SUPERVISOR"}
+	worker := models.User{ID: 2, Name: "Worker", Role: "WORKER"}
 	req := dto.CreateTaskRequest{
-		Title:       "Write complete documentation",
-		Description: "Complete the README",
+		Title:       "Testar persistência no banco",
+		Description: "Garantir que a query de INSERT está funcionando",
 	}
-	mockSupervisor := models.User{
-		ID:   1,
-		Name: "Supervisor Teste",
-		Role: string(models.Supervisor),
-	}
+	t.Run("Must create task with success if supervisor role", func(t *testing.T) {
+		task, err := service.CreateTask(req, supervisor)
+		if err != nil {
+			t.Fatalf("didn't expect error, but got: %v", err)
+		}
+		if task.ID == 0 {
+			t.Error("expected a real ID, got 0")
+		}
+		if task.Title != req.Title {
+			t.Errorf("expected title %q, got %q", req.Title, task.Title)
+		}
+		if task.Status != models.Created {
+			t.Errorf("expected initial status CREATED, got %q", task.Status)
+		}
+	})
+	t.Run("Must return ErrUnauthorized if worker role", func(t *testing.T) {
+		task, err := service.CreateTask(req, worker)
 
-	task, err := service.CreateTask(req, mockSupervisor) // <- Passando o mockSupervisor aqui
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if task.Title != req.Title {
-		t.Errorf("expected title %q, got %q", req.Title, task.Title)
-	}
-	if task.Description != req.Description {
-		t.Errorf("expected description %q, got %q", req.Description, task.Description)
-	}
-	if task.Status != models.Created {
-		t.Errorf("expected status %q, got %q", models.Created, task.Status)
-	}
+		if err == nil {
+			t.Fatal("expected auth error, but didn't got")
+		}
+		if !errors.Is(err, ErrUnauthorized) {
+			t.Errorf("expected error %q, but got %q", ErrUnauthorized, err)
+		}
+		if task != nil {
+			t.Error("didn't expect any task to be created")
+		}
+	})
 }
