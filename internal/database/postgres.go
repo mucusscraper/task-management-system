@@ -2,13 +2,11 @@ package database
 
 import (
 	"database/sql"
-	"embed"
 	"fmt"
 
+	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 )
-
-var embedMigrations embed.FS
 
 func NewPostgres() (*sql.DB, error) {
 	connStr := "host=localhost port=5432 user=postgres password=postgres dbname=task_management sslmode=disable"
@@ -27,7 +25,6 @@ func NewPostgres() (*sql.DB, error) {
 }
 
 func runMigrations(db *sql.DB) error {
-	goose.SetBaseFS(embedMigrations)
 	if err := goose.SetDialect("postgres"); err != nil {
 		return err
 	}
