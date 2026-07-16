@@ -10,5 +10,4 @@ SELECT setval(
 );
 
 -- +goose Down
-DELETE FROM users
-WHERE id IN (1,2,3);
+TRUNCATE TABLE users RESTART IDENTITY CASCADE;

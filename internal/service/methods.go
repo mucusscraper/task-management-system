@@ -20,11 +20,11 @@ func (s *TaskService) CreateTask(req dto.CreateTaskRequest, user models.User) (*
 		Status:      models.Created,
 	}
 	query := `
-		INSERT INTO tasks (title, description, status)
-		VALUES ($1, $2, $3)
+		INSERT INTO tasks (title, description, status, created_by)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, updated_at
 	`
-	err := s.db.QueryRow(query, task.Title, task.Description, string(task.Status)).Scan(
+	err := s.db.QueryRow(query, task.Title, task.Description, string(task.Status), user.ID).Scan(
 		&task.ID,
 		&task.CreatedAt,
 		&task.UpdatedAt,
@@ -85,7 +85,7 @@ func (s *TaskService) UpdateStatus(taskID int, req dto.UpdateTaskStatusRequest, 
 	}
 	var currentStatus string
 	var assignedTo *int
-	checkQuery := `SELECT status FROM tasks WHERE id=$1`
+	checkQuery := `SELECT status, assigned_to FROM tasks WHERE id=$1`
 	err := s.db.QueryRow(checkQuery, taskID).Scan(&currentStatus, &assignedTo)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -129,6 +129,7 @@ func (s *TaskService) UpdateStatus(taskID int, req dto.UpdateTaskStatusRequest, 
 		if err != nil {
 			log.Printf("failed to save notification: %v", err)
 		}
+		fmt.Println(notificationMessage)
 	} else if currentStatus == string(models.InProgress) {
 		updateQuery := `
 			UPDATE tasks
@@ -158,6 +159,7 @@ func (s *TaskService) UpdateStatus(taskID int, req dto.UpdateTaskStatusRequest, 
 		if err != nil {
 			log.Printf("failed to save notification: %v", err)
 		}
+		fmt.Println(notificationMessage)
 	}
 	return task, nil
 }
