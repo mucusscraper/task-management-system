@@ -62,7 +62,7 @@ The project is structured following clean, layered architecture principles to en
 ## Prerequisites & Installation
 
 1. Database configuration:
-The application is configured to connect to PostgreSQL using the following credentials by default:
+The application is configured to connect to PostgreSQL using the following credentials by default: 
 
 - Host: ```localhost```
 - Port: ```5432```
